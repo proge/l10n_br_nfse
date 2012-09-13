@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+  <data>
+
+    <record id="view_manage_nfse" model="ir.ui.view">
+      <field name="name">NFS-e</field>
+      <field name="model">l10n_br_nfse.manage_nfse</field>
+      <field name="type">form</field>
+      <field name="arch" type="xml">
+        <form string="NFS-e">
+
+          <group col="5">
+
+            <group colspan="5" states="init">
+              <label colspan="4" width="130"
+                string="This assistant let you send and cancel the selected invoice(s)." 
+                />
+              <field name="state" invisible="1" />
+            </group>
+
+            <group colspan="5" states="down">
+              <label string="Communication can't be estabilished at the moment"
+                colspan="4" />
+            </group>
+
+            <group colspan="5" states="failed">
+              <label string="Some operations couldn't be done." colspan="4" />
+            </group>
+
+            <group colspan="5" states="nothing">
+              <label string="Nothing to do." colspan="4" />
+            </group>
+
+            <group colspan="5" states="done">
+              <label string="Operation successful." colspan="4" />
+            </group>
+            
+            <field name="invoice_status" colspan="4" nolabel="1" mode="tree" width="550" height="200" readonly="1" >
+              <tree string="Selected invoices">
+                <field name="number" />
+                <field name="partner_id" />
+                <field name="company_id" />
+                <field name="nfse_status" />
+                <field name="nfse_retorno" />
+              </tree>
+            </field>
+
+            <group colspan="5" col="5">
+              <separator string="" colspan="5" />
+              <label colspan="1" width="200" />
+              <button special="cancel" string="Close" icon="gtk-go-forward" />
+              <button name="cancel_nfse" string="Cancel NFS-e"
+                type="object" states="init" icon="gtk-cancel" />
+              <button name="send_nfse" string="Send NFS-e"
+                type="object" states="init" icon="gtk-ok" />
+            </group>
+
+          </group>
+
+        </form>
+      </field>
+    </record>
+
+    <record id="action_view_manage_nfse" model="ir.actions.act_window">
+      <field name="name">NFS-e</field>
+      <field name="res_model">l10n_br_nfse.manage_nfse</field>
+      <field name="view_type">form</field>
+      <field name="view_mode">form</field>
+      <field name="target">new</field>
+    </record>
+
+    <act_window id="manage_nfse" key2="client_action_multi"
+      name="NFS-e" res_model="l10n_br_nfse.manage_nfse" src_model="account.invoice"
+      view_id="view_manage_nfse" view_mode="form" target="new"
+      view_type="form" groups="base.group_extended" />
+
+  </data>
+</openerp>
