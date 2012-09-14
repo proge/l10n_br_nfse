@@ -26,17 +26,16 @@ from tools.translate import _
 import base64
 import urllib
 import sys
-sys.path.append('/home/daniel/devel/PySPED/')
 from nfse.processador import ProcessadorNFSe, SIGNATURE
 from nfse.nfse_xsd import *
 from uuid import uuid4
 import datetime
 
 NFSE_STATUS = {
-    'send_ok': _('Sent'),
-    'send_failed': _('Failed to send'),
-    'cancel_ok': _('Canceled'),
-    'cancel_failed': _('Failed to cancel'),
+    'send_ok': 'Transmitida',
+    'send_failed': 'Falhou ao transmitir',
+    'cancel_ok': 'Cancelada',
+    'cancel_failed': 'Falhou ao cancelar',
     }
 
 

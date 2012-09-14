@@ -26,8 +26,8 @@ from osv import fields, osv
 class account_invoice(osv.osv):
     _inherit = 'account.invoice'
     _columns = {
-        'nfse_status': fields.char('NFS-e Status', size=44, readonly=True),
-        'nfse_retorno': fields.char('NFS-e Response', size=256, readonly=True),
+        'nfse_status': fields.char('Status da NFS-e', size=44, readonly=True),
+        'nfse_retorno': fields.char('Retorno da NFS-e', size=256, readonly=True),
         }
 
 

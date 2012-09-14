@@ -13,30 +13,32 @@
 
             <group colspan="5" states="init">
               <label colspan="4" width="130"
-                string="This assistant let you send and cancel the selected invoice(s)." 
-                />
+                string="Este assistente lhe permite enviar e cancelar as notas fiscais selecionadas." />
               <field name="state" invisible="1" />
             </group>
 
             <group colspan="5" states="down">
-              <label string="Communication can't be estabilished at the moment"
+              <label string="Comunicação não pode ser realizada no momento."
                 colspan="4" />
             </group>
 
             <group colspan="5" states="failed">
-              <label string="Some operations couldn't be done." colspan="4" />
+              <label string="Algumas operações não puderam ser realizadas."
+                colspan="4" />
             </group>
 
             <group colspan="5" states="nothing">
-              <label string="Nothing to do." colspan="4" />
+              <label string="Nada a fazer." colspan="4" />
             </group>
 
             <group colspan="5" states="done">
-              <label string="Operation successful." colspan="4" />
+              <label string="Operação realizada com sucesso."
+                colspan="4" />
             </group>
-            
-            <field name="invoice_status" colspan="4" nolabel="1" mode="tree" width="550" height="200" readonly="1" >
-              <tree string="Selected invoices">
+
+            <field name="invoice_status" colspan="4" nolabel="1"
+              mode="tree" width="550" height="200" readonly="1">
+              <tree string="Notas Fiscais">
                 <field name="number" />
                 <field name="partner_id" />
                 <field name="company_id" />
@@ -48,11 +50,12 @@
             <group colspan="5" col="5">
               <separator string="" colspan="5" />
               <label colspan="1" width="200" />
-              <button special="cancel" string="Close" icon="gtk-go-forward" />
+              <button special="cancel" string="Fechar" icon="gtk-cancel" />
+
               <button name="cancel_nfse" string="Cancel NFS-e"
-                type="object" states="init" icon="gtk-cancel" />
-              <button name="send_nfse" string="Send NFS-e"
                 type="object" states="init" icon="gtk-ok" />
+              <button name="send_nfse" string="Send NFS-e" type="object"
+                states="init" icon="gtk-go-forward" />
             </group>
 
           </group>
