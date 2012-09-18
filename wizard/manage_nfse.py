@@ -26,8 +26,8 @@ from tools.translate import _
 import base64
 import urllib
 import sys
-from nfse.processador import ProcessadorNFSe, SIGNATURE
-from nfse.nfse_xsd import *
+from pysped_nfse.processador import ProcessadorNFSe, SIGNATURE
+from pysped_nfse.nfse_xsd import *
 from uuid import uuid4
 import datetime
 
