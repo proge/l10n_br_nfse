@@ -27,9 +27,13 @@ import base64
 import urllib
 import sys
 from pysped_nfse.processador import ProcessadorNFSe, SIGNATURE
+from pysped_nfse.processador_sp import ProcessadorNFSeSP, tpRPS
 from pysped_nfse.nfse_xsd import *
 from uuid import uuid4
 import datetime
+import re
+import unicodedata
+import string
 
 NFSE_STATUS = {
     'send_ok': 'Transmitida',
@@ -86,7 +90,7 @@ class manage_nfse(osv.osv_memory):
 
         return data
 
-    def check_server(self, cr, uid, ids, server_host):
+    def _check_server(self, cr, uid, ids, server_host):
         """Check if server is pinging"""
         server_up = False
 
@@ -101,114 +105,215 @@ class manage_nfse(osv.osv_memory):
 
         return server_up
 
-    def send_nfse(self, cr, uid, ids, context=None):
-        """Send one or many NFS-e"""
+    def _check_invoices_are_services(self, invoices):
+        check = True
+        for inv in invoices:
+            if inv.fiscal_type != 'service':
+                check = False
+                break
+        return check
 
-        sent_invoices = []
-        unsent_invoices = []
+    def _send_nfse(self, cr, uid, ids, context, test=True):
+        """Test NFS-e dispatch"""
 
         inv_obj = self.pool.get('account.invoice')
         active_ids = context.get('active_ids', [])
 
         conditions = [('id', 'in', active_ids),
-                      ('nfse_status', '<>', NFSE_STATUS['send_ok'])]
+                      '|', ('nfe_status', '=', None),
+                      ('nfse_status', '!=', NFSE_STATUS['send_ok'])]
         invoices_to_send = inv_obj.search(cr, uid, conditions)
 
-        for inv in inv_obj.browse(cr, uid, invoices_to_send, context=context):
-            company = self.pool.get('res.company').browse(cr,
-                                                          uid,
-                                                          [inv.company_id.id]
-                                                          )[0]
-            server_host = company.nfse_server_host
+        lote_rps = []
+        valor_total_servicos = 0
+        valor_total_deducoes = 0
+        datas = []
 
-            if self.check_server(cr, uid, ids, server_host):
-                server_address = company.nfse_server_address
-                cert_file_content = base64.decodestring(company.nfse_cert_file)
+        invoices = inv_obj.browse(cr, uid, invoices_to_send, context=context)
+        
+        if not self._check_invoices_are_services(invoices):
+            raise osv.except_osv(
+                u'Não foi possível completar a operação.',
+                u'Uma ou mais faturas não são de serviço.',
+                )
 
-                caminho_temporario = u'/tmp/'
-                cert_file = caminho_temporario + uuid4().hex
-                arq_tmp = open(cert_file, 'w')
-                arq_tmp.write(cert_file_content)
-                arq_tmp.close()
+        for inv in invoices:
+            company = self.pool.get('res.company').browse(
+                cr, uid, inv.company_id.id
+                )
 
-                cert_password = company.nfse_cert_password
-
-                processor = ProcessadorNFSe(
-                    server_host,
-                    server_address,
-                    cert_file,
-                    cert_password,
+            if not company.nfse_cert_file or not company.nfse_cert_password:
+                raise osv.except_osv(
+                    u'Faltam dados no cadastro da empresa.',
+                    u'Um certificado e sua senha correspondente devem ser ' +
+                    u'informados na aba NFS-e do cadastro da empresa %s.' %
+                    company.name,
                     )
 
-                id_rps = tcIdentificacaoRps(Numero=1, Serie=1, Tipo=1)
-                data_emissao = datetime.datetime(2012, 2, 13).isoformat()
-                prestador = tcIdentificacaoPrestador(Cnpj='22222222000191')
-                inf_rps = tcInfRps(
-                    IdentificacaoRps=id_rps,
-                    DataEmissao=data_emissao,
-                    NaturezaOperacao=1,
-                    RegimeEspecialTributacao=1,
-                    OptanteSimplesNacional=True,
-                    IncentivadorCultural=True,
-                    Status=1,
-                    Servico=tcDadosServico(Valores=tcValores(ValorServicos=1,
-                                                             ValorDeducoes=1,
-                                                             ValorPis=1,
-                                                             ValorCofins=1,
-                                                             ValorInss=1,
-                                                             ValorIr=1,
-                                                             ValorCsll=1,
-                                                             IssRetido=1,
-                                                             ),
-                                           ItemListaServico=1,
-                                           CodigoCnae=1,
-                                           CodigoTributacaoMunicipio=1,
-                                           Discriminacao=1,
-                                           CodigoMunicipio=1,
-                                           ),
-                    Prestador=prestador
-                    )
-                rps = [tcRps(InfRps=inf_rps, Signature=SIGNATURE)]
+            cert_file_content = base64.decodestring(company.nfse_cert_file)
 
-                lote_rps = tcLoteRps(NumeroLote=1,
-                                     Cnpj='22222222000191',
-                                     InscricaoMunicipal=1,
-                                     QuantidadeRps=1,
-                                     ListaRps=ListaRpsType(rps)
-                                     )
-                code, title, content = processor.enviar_lote_rps(lote_rps)
+            caminho_temporario = u'/tmp/'
+            cert_file = caminho_temporario + uuid4().hex
+            arq_tmp = open(cert_file, 'w')
+            arq_tmp.write(cert_file_content)
+            arq_tmp.close()
 
-                # FIXME: check result instead of code
-                if code == 200:
-                    sent_invoices.append(inv.id)
+            cert_password = company.nfse_cert_password
 
-                    data = {'nfse_status': NFSE_STATUS['send_ok']}
+            company_addr_ids = self.pool.get('res.partner').address_get(cr, uid, [company.partner_id.id], ['default'])
+            company_addr = self.pool.get('res.partner.address').browse(cr, uid, [company_addr_ids['default']])[0]
+            partner_addr_ids = self.pool.get('res.partner').address_get(cr, uid, [inv.partner_id.id], ['default'])
+            partner_addr = self.pool.get('res.partner.address').browse(cr, uid, [partner_addr_ids['default']])[0]
+            print 'state:', company_addr.l10n_br_city_id.state_id.code
+
+            processor = ProcessadorNFSeSP(
+                cert_file,
+                cert_password,
+                )
+
+            if self._check_server(cr, uid, ids, processor.servidor):
+
+                data_emissao = inv.date_invoice
+
+                if partner_addr.l10n_br_city_id and partner_addr.state_id:
+                    city_ibge_code = str(partner_addr.state_id.ibge_code) + \
+                        str(partner_addr.l10n_br_city_id.ibge_code)
                 else:
-                    unsent_invoices.append(inv.id)
+                    city_ibge_code = None
 
-                    reason = '{} - {}'.format(code, title)
-                    data = {
-                        'nfse_status': NFSE_STATUS['send_failed'],
-                        'nfse_retorno': reason,
-                        }
+                valor_servicos = inv.amount_untaxed
+                valor_deducoes = 0
+                if inv.amount_tax < 0:
+                    valor_deducoes = inv.amount_tax
 
-                self.pool.get('account.invoice').write(cr,
-                                                       uid,
-                                                       inv.id,
-                                                       data,
-                                                       context=context
-                                                       )
+                valor_total_servicos += valor_servicos
+                valor_total_deducoes += valor_deducoes
 
-        if len(sent_invoices) == 0 and len(unsent_invoices) == 0:
-            result = {'state': 'nothing'}
-        elif len(unsent_invoices) > 0:
-            result = {'state': 'failed'}
+                impostos = ('pis', 'cofins','inss','ir','csll','iss_retido')
+                valores = {x: 0 for x in impostos}
+                aliquota = 0
+
+                for inv_tax in inv.tax_line:
+                    if inv_tax.tax_code_id.domain in impostos:
+                        valores[inv_tax.tax_code_id.domain] += inv_tax.amount
+                        if inv_tax.tax_code_id.domain == 'iss_retido':
+                            # FIXME: verificar se esse valor está correto
+                            aliquota = inv_tax.tax_code_id.amount
+
+                iss_retido = valores['iss_retido'] < 0
+
+                discriminacoes = []
+
+                for inv_line in inv.invoice_line:
+                    discriminacoes.append(inv_line.name)
+
+                discriminacao = '|'.join(discriminacoes)
+                
+                if not inv.partner_id.inscr_mun:
+                    raise osv.except_osv(
+                        u'Faltam dados no cadastro do tomador.',
+                        u'Informe a inscrição municipal do parceiro %s.' %
+                        inv.partner_id.name,
+                        )
+                if not inv.partner_id.inscr_est:
+                    raise osv.except_osv(
+                        u'Faltam dados no cadastro do tomador.',
+                        u'Informe a inscrição estadual do parceiro %s.' %
+                        inv.partner_id.name,
+                        )
+
+                lote_rps.append({
+                    # FIXME: por enquanto somente RPS suportado
+                    'TipoRPS': 'RPS',
+                    'DataEmissao': data_emissao,
+                    # TODO: tpStatusNFe
+                    'StatusRPS': 'N',
+                    'TributacaoRPS': company.tributacao or 'T',
+                    'ValorServicos': valor_servicos,
+                    'ValorDeducoes': valor_deducoes,
+                    'ValorPIS': valores['pis'],
+                    'ValorCOFINS': valores['cofins'],
+                    'ValorINSS': valores['inss'],
+                    'ValorIR': valores['ir'],
+                    'ValorCSLL': valores['csll'],
+                    # TODO: tpCodigoServico - cfop
+                    'CodigoServico': 12345,
+                    'AliquotaServicos': aliquota,
+                    'ISSRetido': iss_retido,
+                    'CPFCNPJTomador': re.sub('[^0-9]', '', inv.partner_id.cnpj_cpf),
+                    'InscricaoMunicipalTomador': inv.partner_id.inscr_mun,
+                    'InscricaoEstadualTomador': inv.partner_id.inscr_est,
+                    'RazaoSocialTomador': inv.partner_id.legal_name,
+                    'Logradouro': partner_addr.street,
+                    'NumeroEndereco': partner_addr.number,
+                    'ComplementoEndereco': partner_addr.street2,
+                    'Bairro': partner_addr.district,
+                    'Cidade': city_ibge_code,
+                    'UF': partner_addr.state_id and \
+                        partner_addr.state_id.code or None,
+                    'CEP': partner_addr.zip,
+                    'EmailTomador': partner_addr.email,
+                    'Discriminacao': discriminacao,
+                    'SerieRPS': inv.document_serie_id.code,
+                    'NumeroRPS': inv.internal_number,
+                    })
+
+                datas.append(data_emissao)
+
+        if len(lote_rps):
+            datas.sort()
+            cabecalho = {
+                'CPFCNPJRemetente': re.sub('[^0-9]', '', company.cnpj),
+                'transacao': True,
+                'dtInicio': datas[0],
+                'dtFim': datas[-1],
+                'QtdRPS': len(lote_rps),
+                'ValorTotalServicos': valor_total_servicos,
+                'ValorTotalDeducoes': valor_total_deducoes,
+                'Versao': 1,
+                }
+
+            if test:
+                code, title, content = processor.testar_envio_lote_rps(
+                    cabecalho=cabecalho,
+                    lote_rps=lote_rps
+                    )
+            else:
+                code, title, content = processor.enviar_lote_rps(
+                    cabecalho=cabecalho,
+                    lote_rps=lote_rps
+                    )
+
+            print code, title, content
+
+            # FIXME: check result instead of code
+            if code == 200:
+                data = {'nfse_status': NFSE_STATUS['send_ok']}
+                result = {'state': 'done'}
+            else:
+                reason = '{} - {}'.format(code, title)
+                data = {
+                    'nfse_status': NFSE_STATUS['send_failed'],
+                    'nfse_retorno': reason,
+                    }
+                result = {'state': 'failed'}
+
+            self.pool.get('account.invoice').write(
+                cr, uid, inv.id, data, context=context
+                )
         else:
-            result = {'state': 'done'}
+            result = {'state': 'nothing'}
 
         self.write(cr, uid, ids, result)
 
         return True
+
+    def test_send_nfse(self, cr, uid, ids, context=None):
+        return self._send_nfse(cr, uid, ids, context, True)
+
+    def send_nfse(self, cr, uid, ids, context=None):
+        """Send one or many NFS-e"""
+        return self._send_nfse(cr, uid, ids, context, False)
 
     def cancel_nfse(self, cr, uid, ids, context=None):
         """Cancel one or many NFS-e"""
@@ -231,8 +336,7 @@ class manage_nfse(osv.osv_memory):
                                                           )[0]
             server_host = company.nfse_server_host
 
-            if self.check_server(cr, uid, ids, server_host):
-                server_address = company.nfse_server_address
+            if self._check_server(cr, uid, ids, server_host):
                 cert_file_content = base64.decodestring(company.nfse_cert_file)
 
                 caminho_temporario = u'/tmp/'
@@ -243,28 +347,22 @@ class manage_nfse(osv.osv_memory):
 
                 cert_password = company.nfse_cert_password
 
-                processor = ProcessadorNFSe(
-                    server_host,
-                    server_address,
-                    cert_file,
-                    cert_password,
-                    )
+                processor = ProcessadorNFSeSP(cert_file, cert_password)
 
-                nfse = tcIdentificacaoNfse(Numero=1,
-                                           Cnpj='22222222000191',
-                                           InscricaoMunicipal=1,
-                                           CodigoMunicipio=1
-                                           )
-                cancelamento = tcInfPedidoCancelamento(IdentificacaoNfse=nfse,
-                                                       CodigoCancelamento='E64'
-                                                       )
+                code, title, content = processor.cancelar_nfse({
+                    'CPFCNPJRemetente': company.cnpj,
+                    'InscricaoPrestador': company.insc_mun,
+                    'InscricaoTomador': inv.partner_id.insc_mun,
+                    'NumeroRPS': inv.internal_number,
+                    'SerieRPS': inv.document_serie_id.code,
+                    # TODO: número gerado pelo sistema da prefeitura
+                    'NumeroNFe': '',
+                    # TODO: código gerado pelo sistema da prefeitura
+                    'CodigoVerificacao': 1,
+                    'Versao': 1,
+                    })
 
-                pedido = tcPedidoCancelamento(
-                    InfPedidoCancelamento=cancelamento,
-                    Signature=SIGNATURE
-                    )
-
-                code, title, content = processor.cancelar_nfse(pedido)
+                print code, title, content
 
                 # FIXME: check result instead of code
                 if code == 200:
@@ -281,12 +379,9 @@ class manage_nfse(osv.osv_memory):
                         'nfse_retorno': reason,
                         }
 
-                self.pool.get('account.invoice').write(cr,
-                                                       uid,
-                                                       inv.id,
-                                                       data,
-                                                       context=context
-                                                       )
+                self.pool.get('account.invoice').write(
+                    cr, uid, inv.id, data, context=context
+                    )
 
         if len(canceled_invoices) == 0 and len(failed_invoices) == 0:
             result = {'state': 'nothing'}
@@ -294,6 +389,73 @@ class manage_nfse(osv.osv_memory):
             result = {'state': 'failed'}
         else:
             result = {'state': 'done'}
+
+        self.write(cr, uid, ids, result)
+
+        return True
+
+    def check_nfse(self, cr, uid, ids, context=None):
+        """Check one or many NFS-e"""
+        result = {'state': 'failed'}
+
+        inv_obj = self.pool.get('account.invoice')
+        active_ids = context.get('active_ids', [])
+
+        conditions = [('id', 'in', active_ids),
+                      ('nfse_status', '=', NFSE_STATUS['send_ok'])]
+        invoices = inv_obj.search(cr, uid, conditions)
+
+        for inv in inv_obj.browse(cr, uid, invoices,
+                                  context=context):
+            company = self.pool.get('res.company').browse(cr,
+                                                          uid,
+                                                          [inv.company_id.id]
+                                                          )[0]
+            server_host = company.nfse_server_host
+
+            if self._check_server(cr, uid, ids, server_host):
+                cert_file_content = base64.decodestring(company.nfse_cert_file)
+
+                caminho_temporario = u'/tmp/'
+                cert_file = caminho_temporario + uuid4().hex
+                arq_tmp = open(cert_file, 'w')
+                arq_tmp.write(cert_file_content)
+                arq_tmp.close()
+
+                cert_password = company.nfse_cert_password
+
+                processor = ProcessadorNFSeSP(cert_file, cert_password)
+
+                code, title, content = processor.consultar_nfse({
+                    'CPFCNPJRemetente': company.cnpj,
+                    'InscricaoPrestador': company.insc_mun,
+                    'NumeroRPS': inv.internal_number,
+                    'SerieRPS': inv.document_serie_id.code,
+                    # TODO: número gerado pelo sistema da prefeitura
+                    'NumeroNFe': '',
+                    # TODO: código gerado pelo sistema da prefeitura
+                    'CodigoVerificacao': 1,
+                    'Versao': 1,
+                    })
+
+                print code, title, content
+
+                # FIXME: check result instead of code
+                if code == 200:
+                    data = {'nfse_status': NFSE_STATUS['cancel_ok']}
+                    result = {'state': 'done'}
+
+                else:
+                    reason = '{} - {}'.format(code, title)
+                    data = {
+                        'nfse_status': NFSE_STATUS['cancel_failed'],
+                        'nfse_retorno': reason,
+                        }
+                    result = {'state': 'failed'}
+
+                self.pool.get('account.invoice').write(
+                    cr, uid, inv.id, data, context=context
+                    )
 
         self.write(cr, uid, ids, result)
 

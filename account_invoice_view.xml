@@ -5,12 +5,16 @@
     <record model="ir.ui.view" id="view_l10n_br_nfse_account_invoice_form">
       <field name="name">l10n_br_nfse.account_invoice.form</field>
       <field name="model">account.invoice</field>
-      <field name="inherit_id" ref="account.invoice_form"/>
+      <field name="inherit_id" ref="l10n_br_account.view_l10n_br_account_invoice_form"/>
       <field name="arch" type="xml">
+        <field position="after" name="name">
+          <field name="fiscal_type" invisible="1"/>
+        </field>
         <notebook>
-          <page string="NFS-e">
+          <page string="NFS-e" attrs="{'invisible':[('fiscal_type','!=','service')]}" >
             <group colspan="4" name="l10n_br_nfse" >
               <separator colspan="4" string="Additional NFS-e Data"/>
+              <field colspan="4" name="nfse_numero"/>
               <field colspan="4" name="nfse_status"/>
               <field name="nfse_retorno"/>
             </group>

@@ -2,7 +2,7 @@
 
 ##############################################################################
 #                                                                            #
-#  Copyright (C) 2012 Proge Informática Ltda (<http://www.proge.com.br>).    #
+#  Copyright (C) 2013 Proge Informática Ltda (<http://www.proge.com.br>).    #
 #                                                                            #
 #  Author Daniel Hartmann <daniel@proge.com.br>                              #
 #                                                                            #
@@ -21,27 +21,24 @@
 #                                                                            #
 ##############################################################################
 
-{
-    "name": "NFS-e",
-    "version": "0.1",
-    "author": "PROGE",
-    "category": "Localization",
-    "website": "http://proge.com.br",
-    "description": """
-    Module to support SPED NFS-e.
-    """,
-    'depends': [
-        'l10n_br_account',
-        'l10n_br_sale',
-        ],
-    'init_xml': [],
-    'update_xml': [
-        'account_invoice_view.xml',
-        'res_company_view.xml',
-        'wizard/manage_nfse_view.xml',
-        ],
-    'demo_xml': [],
-    'test': [],
-    'installable': True,
-    'active': False,
-}
+from osv import fields, osv
+
+
+class res_company(osv.osv):
+    _inherit = 'res.company'
+    _columns = {
+        'tributacao': fields.selection(
+            (('T', u'Tributação no municipio'),
+             ('F', u'Tributação fora do municipio'),
+             ('I', u'Isento'),
+             ('J', u'ISS Suspenso por Decisão Judicial'),
+             ),
+            u'Tributação',
+            ),
+        }
+    _defaults = {
+        'tributacao': 'T',
+        }
+
+
+res_company()
