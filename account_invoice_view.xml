@@ -13,8 +13,8 @@
         <notebook>
           <page string="NFS-e" attrs="{'invisible':[('fiscal_type','!=','service')]}" >
             <group colspan="4" name="l10n_br_nfse" >
-              <separator colspan="4" string="Additional NFS-e Data"/>
               <field colspan="4" name="nfse_numero"/>
+              <field colspan="4" name="nfse_codigo_verificacao"/>
               <field colspan="4" name="nfse_status"/>
               <field name="nfse_retorno"/>
             </group>

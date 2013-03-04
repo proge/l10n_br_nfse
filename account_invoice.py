@@ -23,6 +23,7 @@
 
 from osv import fields, osv
 
+
 class account_invoice(osv.osv):
     _inherit = 'account.invoice'
     _columns = {
@@ -31,8 +32,8 @@ class account_invoice(osv.osv):
             u'Retorno da NFS-e', size=256, readonly=True
             ),
         'nfse_numero': fields.integer(u'Número da NFS-e', readonly=True),
-        'nfse_codigo_verificacao': fields.integer(
-            u'Código de Verificação', readonly=True
+        'nfse_codigo_verificacao': fields.char(
+            u'Código de Verificação', size=128, readonly=True
             ),
         }
 
