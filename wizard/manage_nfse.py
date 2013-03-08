@@ -100,13 +100,16 @@ class manage_nfse(osv.osv_memory):
         if not server_host.startswith('http'):
             server_host = 'https://' + server_host
 
-        if urllib2.urlopen(server_host).getcode() == 200:
-            server_up = True
+        try:
+            if urllib2.urlopen(server_host).getcode() == 200:
+                server_up = True
+        except urllib2.HTTPError:
+            server_up = False
 
         if not server_up:
             raise osv.except_osv(
-                u'Erro de comunicação',
-                u'Não foi possível conectar ao servidor. ' + \
+                u'Erro de comunicação!',
+                u'Não foi possível a conexão com o servidor. ' + \
                 u'Tente novamente mais tarde.'
                 )
 
