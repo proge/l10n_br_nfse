@@ -66,9 +66,9 @@ class manage_nfse(osv.osv_memory):
                                    ('failed', 'failed'),
                                    ('nothing', 'nothing'),
                                    ], 'state', readonly=True),
-        'invoice_status': fields.many2many('account.invoice',
-                                           string='Invoice Status',
-                                           ),
+        'selected_invoices': fields.many2many('account.invoice',
+                                              string=u'Faturas Selecionadas',
+                                              ),
         }
     _defaults = {
         'state': 'init',
@@ -87,7 +87,9 @@ class manage_nfse(osv.osv_memory):
         invoices = self.pool.get('account.invoice').browse(cr, uid, active_ids,
                                                            context=context
                                                            )
-        data.update(invoice_status=[i.id for i in invoices])
+        selected_invoices = [i.id for i in invoices
+                           if i.state in ('open', 'sefaz_export', 'paid')]
+        data.update(selected_invoices=selected_invoices)
 
         return data
 
@@ -160,7 +162,14 @@ class manage_nfse(osv.osv_memory):
         result = {}
 
         inv_obj = self.pool.get('account.invoice')
-        active_ids = context.get('active_ids', [])
+        active_ids = [i.id for i in
+                      self.browse(cr, uid, ids[0]).selected_invoices]
+
+        if len(active_ids) == 0:
+            raise osv.except_osv(
+                u'Atenção!',
+                u'Não há notas confirmadas para efetuar o envio.'
+                )
 
         conditions = [('id', 'in', active_ids),
                       '|', ('nfe_status', '=', None),
@@ -249,7 +258,7 @@ class manage_nfse(osv.osv_memory):
                     discriminacoes.append(inv_line.name)
 
                 discriminacao = '|'.join(discriminacoes)
-                
+
                 inscricao_municipal_tomador = inv.partner_id.inscr_mun
 
                 # São Paulo
@@ -265,6 +274,15 @@ class manage_nfse(osv.osv_memory):
                         inscricao_municipal_tomador = None
 
                 service_code = inv.fiscal_operation_id.code
+
+                if inv.partner_id.cnpj_cpf:
+                    cnpj_tomador = re.sub('[^0-9]', '', inv.partner_id.cnpj_cpf)
+                else:
+                    raise osv.except_osv(
+                        u'Faltam dados no cadastro do cliente.',
+                        u'O CNPJ do cliente %s é obrigatório.' %
+                        inv.partner_id.name,
+                        )
 
                 lote_rps.append({
                     # FIXME: por enquanto somente RPS suportado
@@ -283,7 +301,7 @@ class manage_nfse(osv.osv_memory):
                     'CodigoServico': int(service_code),
                     'AliquotaServicos': aliquota,
                     'ISSRetido': iss_retido,
-                    'CPFCNPJTomador': re.sub('[^0-9]', '', inv.partner_id.cnpj_cpf),
+                    'CPFCNPJTomador': cnpj_tomador,
                     'TipoInscricaoTomador': inv.partner_id.tipo_pessoa,
                     'InscricaoMunicipalTomador': inscricao_municipal_tomador,
                     'InscricaoEstadualTomador': inv.partner_id.inscr_est or None,
@@ -307,8 +325,16 @@ class manage_nfse(osv.osv_memory):
 
         if len(lote_rps):
             datas.sort()
+            if company.cnpj:
+                cnpj_remetente = re.sub('[^0-9]', '', company.cnpj)
+            else:
+                raise osv.except_osv(
+                    u'Faltam dados no cadastro da empresa.',
+                    u'O CNPJ da empresa %s é obrigatório.' %
+                    company.name,
+                    )
             cabecalho = {
-                'CPFCNPJRemetente': re.sub('[^0-9]', '', company.cnpj),
+                'CPFCNPJRemetente': cnpj_remetente,
                 'InscricaoMunicipalPrestador': re.sub(
                     '[^0-9]', '', company.inscr_mun
                     ),
@@ -416,7 +442,14 @@ class manage_nfse(osv.osv_memory):
         failed_invoices = []
 
         inv_obj = self.pool.get('account.invoice')
-        active_ids = context.get('active_ids', [])
+        active_ids = [i.id for i in
+                      self.browse(cr, uid, ids[0]).selected_invoices]
+
+        if len(active_ids) == 0:
+            raise osv.except_osv(
+                u'Atenção!',
+                u'Não há notas confirmadas para efetuar o cancelamento.'
+                )
 
         conditions = [('id', 'in', active_ids),
                       ('nfse_status', '=', NFSE_STATUS['send_ok'])]
@@ -501,7 +534,14 @@ class manage_nfse(osv.osv_memory):
         """Check one or many NFS-e"""
 
         inv_obj = self.pool.get('account.invoice')
-        active_ids = context.get('active_ids', [])
+        active_ids = [i.id for i in
+                      self.browse(cr, uid, ids[0]).selected_invoices]
+
+        if len(active_ids) == 0:
+            raise osv.except_osv(
+                u'Atenção!',
+                u'Não há notas confirmadas para efetuar a consulta.'
+                )
 
         conditions = [('id', 'in', active_ids)]
         invoices = inv_obj.search(cr, uid, conditions)

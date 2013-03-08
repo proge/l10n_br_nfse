@@ -13,7 +13,7 @@
 
             <group colspan="5" states="init">
               <label colspan="4" width="130"
-                string="Este assistente lhe permite enviar e cancelar as notas fiscais selecionadas." />
+                string="Este assistente lhe permite enviar e cancelar as notas fiscais selecionadas, contanto que elas estejam confirmadas no sistema." />
               <field name="state" invisible="1" />
             </group>
 
@@ -36,7 +36,7 @@
                 colspan="4" />
             </group>
 
-            <field name="invoice_status" colspan="4" nolabel="1"
+            <field name="selected_invoices" colspan="4" nolabel="1"
               mode="tree" width="550" height="200" readonly="1">
               <tree string="Notas Fiscais">
                 <field name="number" />
@@ -50,7 +50,7 @@
             <group colspan="6" col="6">
               <separator string="" colspan="6" />
               <label colspan="1" width="200" />
-              <button special="cancel" string="Fechar" icon="gtk-ok" />
+              <button special="cancel" string="Fechar" icon="gtk-close" />
 
               <button name="cancel_nfse" string="Cancelar NFS-e"
                 type="object" states="init" icon="gtk-cancel" />
