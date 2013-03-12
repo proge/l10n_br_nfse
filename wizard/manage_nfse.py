@@ -244,14 +244,12 @@ class manage_nfse(osv.osv_memory):
                 valores = {x: 0 for x in impostos}
                 aliquota = 0
 
-                # FIXME: can invoice lines have different values of the same tax?
-                for inv_line in inv.invoice_line:
-                    for inv_tax in inv_line.invoice_line_tax_id:
-                        if inv_tax.tax_code_id.domain in impostos:
-                            valores[inv_tax.tax_code_id.domain] += \
-                                inv_tax.amount
-                            if inv_tax.tax_code_id.domain == 'iss':
-                                aliquota = inv_tax.amount
+                for inv_tax in inv.tax_line:
+                    if inv_tax.tax_code_id.domain in impostos:
+                        valores[inv_tax.tax_code_id.domain] += \
+                            round(inv_tax.amount, 2)
+                        if inv_tax.tax_code_id.domain == 'iss':
+                            aliquota = round(inv_tax.amount, 2)
 
                 iss_retido = valores['iss_retido'] < 0
 
