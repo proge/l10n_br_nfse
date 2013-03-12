@@ -234,7 +234,7 @@ class manage_nfse(osv.osv_memory):
                 valor_servicos = inv.amount_untaxed
                 valor_deducoes = 0
                 if inv.amount_tax < 0:
-                    valor_deducoes = inv.amount_tax
+                    valor_deducoes = inv.amount_tax * -1
 
                 valor_total_servicos += valor_servicos
                 valor_total_deducoes += valor_deducoes
