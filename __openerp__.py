@@ -34,14 +34,12 @@
         'l10n_br_account',
         'l10n_br_sale',
         ],
-    'init_xml': [],
-    'update_xml': [
+    'data': [
         'account_invoice_view.xml',
         'res_company_view.xml',
         'wizard/manage_nfse_view.xml',
         ],
-    'demo_xml': [],
+    'demo': [],
     'test': [],
     'installable': True,
-    'active': False,
 }
