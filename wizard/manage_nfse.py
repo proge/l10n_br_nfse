@@ -57,7 +57,6 @@ class manage_nfse(osv.osv_memory):
 
     _name = "l10n_br_nfse.manage_nfse"
     _description = "Manage NFS-e"
-    _inherit = "ir.wizard.screen"
     _columns = {
         'company_id': fields.many2one('res.company', 'Company'),
         'state': fields.selection([('init', 'init'),
@@ -160,6 +159,24 @@ class manage_nfse(osv.osv_memory):
             message
             )
 
+    def _default_return(self, cr, uid, ids):
+        ir_model_data = self.pool.get('ir.model.data')
+        __, view_id = ir_model_data.get_object_reference(
+            cr, uid, 'l10n_br_nfse', 'view_manage_nfse'
+            )
+
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'l10n_br_nfse.manage_nfse',
+            'res_id': ids[0],
+            'view_type': 'form',
+            'view_mode': 'form',
+            'views': [(view_id, 'form')],
+            'view_id': False,
+            'target': 'new',
+            'nodestroy': True,
+            }
+
     def _send_nfse(self, cr, uid, ids, context, test=True):
         """Test NFS-e dispatch"""
         result = {}
@@ -211,10 +228,8 @@ class manage_nfse(osv.osv_memory):
 
             cert_password = company.nfse_cert_password
 
-            company_addr_ids = self.pool.get('res.partner').address_get(cr, uid, [company.partner_id.id], ['default'])
-            company_addr = self.pool.get('res.partner.address').browse(cr, uid, [company_addr_ids['default']])[0]
-            partner_addr_ids = self.pool.get('res.partner').address_get(cr, uid, [inv.partner_id.id], ['default'])
-            partner_addr = self.pool.get('res.partner.address').browse(cr, uid, [partner_addr_ids['default']])[0]
+            company_addr = company.partner_id
+            partner_addr = inv.partner_id
 
             proc = ProcessadorNFSeSP(
                 cert_file,
@@ -276,6 +291,14 @@ class manage_nfse(osv.osv_memory):
 
                 service_code = inv.fiscal_operation_id.code
 
+                try:
+                    service_code = int(service_code)
+                except ValueError:
+                    raise osv.except_osv(
+                        u'Operação fiscal incorreta',
+                        u'O código da operação fiscal deve ser numérico.',
+                        )
+
                 if inv.partner_id.cnpj_cpf:
                     cnpj_tomador = re.sub('[^0-9]', '', inv.partner_id.cnpj_cpf)
                 else:
@@ -299,7 +322,7 @@ class manage_nfse(osv.osv_memory):
                     'ValorINSS': valores['inss'],
                     'ValorIR': valores['ir'],
                     'ValorCSLL': valores['csll'],
-                    'CodigoServico': int(service_code),
+                    'CodigoServico': service_code,
                     'AliquotaServicos': aliquota,
                     'ISSRetido': iss_retido,
                     'CPFCNPJTomador': cnpj_tomador,
@@ -427,7 +450,7 @@ class manage_nfse(osv.osv_memory):
 
         self.write(cr, uid, ids, result)
 
-        return True
+        return self._default_return(cr, uid, ids)
 
     def test_send_nfse(self, cr, uid, ids, context=None):
         return self._send_nfse(cr, uid, ids, context, True)
@@ -529,7 +552,7 @@ class manage_nfse(osv.osv_memory):
 
         self.write(cr, uid, ids, result)
 
-        return True
+        return self._default_return(cr, uid, ids)
 
     def check_nfse(self, cr, uid, ids, context=None):
         """Check one or many NFS-e"""
@@ -588,7 +611,7 @@ class manage_nfse(osv.osv_memory):
                     )
 
             if success:
-                
+
                 nfe = res.NFe[0]
                 if nfe.StatusNFe == 'C':
                     raise osv.except_osv(
@@ -604,7 +627,7 @@ class manage_nfse(osv.osv_memory):
             else:
                 self._show_warnings_and_errors(warnings, errors)
 
-        return True
+        return self._default_return(cr, uid, ids)
 
 
 manage_nfse()

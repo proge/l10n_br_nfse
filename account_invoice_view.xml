@@ -7,7 +7,7 @@
       <field name="model">account.invoice</field>
       <field name="inherit_id" ref="l10n_br_account.view_l10n_br_account_invoice_form"/>
       <field name="arch" type="xml">
-        <field position="after" name="name">
+        <field name="document_serie_id" position="after">
           <field name="fiscal_type" invisible="1"/>
         </field>
         <notebook>
