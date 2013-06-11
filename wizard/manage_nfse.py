@@ -264,7 +264,7 @@ class manage_nfse(osv.osv_memory):
                         valores[inv_tax.tax_code_id.domain] += \
                             round(inv_tax.amount, 2)
                         if inv_tax.tax_code_id.domain == 'iss':
-                            aliquota = round(inv_tax.amount, 2)
+                            aliquota = round(inv_tax.aliquota, 2)
 
                 iss_retido = valores['iss_retido'] < 0
 
