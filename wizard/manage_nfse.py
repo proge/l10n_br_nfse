@@ -289,7 +289,7 @@ class manage_nfse(osv.osv_memory):
                     elif partner_addr.l10n_br_city_id.ibge_code != '50308':
                         inscricao_municipal_tomador = None
 
-                service_code = inv.fiscal_operation_id.code
+                service_code = inv.fiscal_operation_id.service_type_id.code
 
                 try:
                     service_code = int(service_code)
