@@ -35,6 +35,7 @@ import datetime
 import re
 import unicodedata
 import string
+import OpenSSL
 
 NFSE_STATUS = {
     'send_ok': 'Transmitida',
@@ -231,10 +232,16 @@ class manage_nfse(osv.osv_memory):
             company_addr = company.partner_id
             partner_addr = inv.partner_id
 
-            proc = ProcessadorNFSeSP(
-                cert_file,
-                cert_password,
-                )
+            try:
+                proc = ProcessadorNFSeSP(
+                    cert_file,
+                    cert_password,
+                    )
+            except OpenSSL.crypto.Error:
+                raise osv.except_osv(
+                   u'O certificado ou a senha do certificado são inválidos.',
+                   u'Acesse o cadastro da empresa e corrija as informações do certificado digital.'
+                   )
 
             if self._check_server(cr, uid, ids, proc.servidor):
 
